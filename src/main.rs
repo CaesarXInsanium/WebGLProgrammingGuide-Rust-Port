@@ -33,7 +33,7 @@ fn main() {
             }
 
             gl.clear(glow::COLOR_BUFFER_BIT);
-            gl.draw_arrays(glow::LINE_LOOP, 0, 3);
+            gl.draw_arrays(glow::POINTS, 0, 3);
             window.gl_swap_window();
         }
 
@@ -139,44 +139,30 @@ unsafe fn init_vertex_buffer(
     let mut vbos: Vec<NativeBuffer> = Vec::new();
     let mut vaos: Vec<VertexArray> = Vec::new();
 
-    let vertices: &[f32] = &[0.0, 0.5, -0.5, -0.5, 0.5, -0.5];
-    let sizes: &[f32] = &[10.0, 20.0, 30.0];
+    let vertices: &[f32] = &[0.0, 0.5, 10.0, -0.5, -0.5,20.0, 0.5, -0.5, 30.0];
 
     let u8vertices = core::slice::from_raw_parts(
         vertices.as_ptr() as *const u8,
         vertices.len() * size_of::<f32>(),
     );
-    let u8sizes =
-        core::slice::from_raw_parts(sizes.as_ptr() as *const u8, sizes.len() * size_of::<f32>());
 
     //vertices buffer
     let vertex_buffer = gl.create_buffer().unwrap();
     gl.bind_buffer(glow::ARRAY_BUFFER, Some(vertex_buffer));
     gl.buffer_data_u8_slice(glow::ARRAY_BUFFER, u8vertices, glow::STATIC_DRAW);
-    let vao = gl.create_vertex_array().unwrap();
-    gl.bind_vertex_array(Some(vao));
 
-    // Position atttribute
+    let fsize:i32 = size_of::<f32>() as i32;
     let a_pos = gl.get_attrib_location(program, "aPos").unwrap();
-    gl.vertex_attrib_pointer_f32(a_pos, 2, glow::FLOAT, false, 0, 0);
-    gl.enable_vertex_attrib_array(a_pos);
-
-    //Size attribute
-
-    let size_buffer = gl.create_buffer().unwrap();
-    gl.bind_buffer(glow::ARRAY_BUFFER, Some(size_buffer));
-    gl.buffer_data_u8_slice(glow::ARRAY_BUFFER, u8sizes, glow::STATIC_DRAW);
+     gl.vertex_attrib_pointer_f32(a_pos, 2, glow::FLOAT, false, fsize * 3, 0);
+     gl.enable_vertex_attrib_array(a_pos);
     let a_point_size = gl.get_attrib_location(program, "aPointSize").unwrap();
-    gl.vertex_attrib_pointer_f32(a_point_size, 1, glow::FLOAT, false, 0, 0);
+    gl.vertex_attrib_pointer_f32(a_point_size, 1, glow::FLOAT, false, fsize *3 , fsize * 2);
     gl.enable_vertex_attrib_array(a_point_size);
-    //let sizevao = gl.create_vertex_array().unwrap();
-    //gl.bind_vertex_array(Some(sizevao));
-    vbos.push(vertex_buffer);
-    vaos.push(vao);
-    vbos.push(size_buffer);
-    //vaos.push(sizevao);
 
-    (vbos, vaos, vertices.len() as i32)
+    vbos.push(vertex_buffer);
+    //vaos.push(sizevao);
+    let n: i32 = 3;
+    (vbos, vaos, n)
 }
 
 #[allow(dead_code)]
