@@ -6,7 +6,6 @@ use std::{mem::size_of, time::Instant};
 const ANGLE_STEP: f32 = 3.14159256;
 
 fn main() {
-    let mut time: Instant = Instant::now();
     unsafe {
         let (gl, window, mut event_loop, _context) = create_sdl2_context();
         let program = create_program(&gl, VERTEX_SOURCE, FRAG_SOURCE);
@@ -34,7 +33,7 @@ fn main() {
             }
 
             gl.clear(glow::COLOR_BUFFER_BIT);
-            gl.draw_arrays(glow::POINTS, 0, 3);
+            gl.draw_arrays(glow::LINE_LOOP, 0, 3);
             window.gl_swap_window();
         }
 
@@ -170,12 +169,12 @@ unsafe fn init_vertex_buffer(
     let a_point_size = gl.get_attrib_location(program, "aPointSize").unwrap();
     gl.vertex_attrib_pointer_f32(a_point_size, 1, glow::FLOAT, false, 0, 0);
     gl.enable_vertex_attrib_array(a_point_size);
-    let sizevao = gl.create_vertex_array().unwrap();
-    gl.bind_vertex_array(Some(sizevao));
+    //let sizevao = gl.create_vertex_array().unwrap();
+    //gl.bind_vertex_array(Some(sizevao));
     vbos.push(vertex_buffer);
     vaos.push(vao);
     vbos.push(size_buffer);
-    vaos.push(sizevao);
+    //vaos.push(sizevao);
 
     (vbos, vaos, vertices.len() as i32)
 }
