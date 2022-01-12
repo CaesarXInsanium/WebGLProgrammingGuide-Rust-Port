@@ -1,15 +1,9 @@
 use glow::*;
 use nalgebra_glm::*;
-use sdl2::{
-    self,
-    event::Event,
-};
-use std::{
-    mem::size_of,
-    time::Instant,
-};
-const ANGLE_STEP: f32 = 3.14159256;
+use sdl2::{self, event::Event};
+use std::{mem::size_of, time::Instant};
 
+const ANGLE_STEP: f32 = 3.14159256;
 
 fn main() {
     let mut time: Instant = Instant::now();
@@ -18,16 +12,9 @@ fn main() {
         let program = create_program(&gl, VERTEX_SOURCE, FRAG_SOURCE);
         gl.use_program(Some(program));
 
-        let (vbo, vao, n) = init_vertex_buffer(&gl, program);
+        let (vbos, vaos, n) = init_vertex_buffer(&gl, program);
 
-        let u_model_matrix = gl.get_uniform_location(program, "uModelMatrix").unwrap();
-        let model_matrix: TMat4<f32> = TMat4::identity();
-        let mut current_angle = 0.0;
-        let mut tick = || {
-            current_angle = animate(&mut time, current_angle);
-            draw(&gl, n, current_angle, &model_matrix, &u_model_matrix);
-        };
-
+        gl.clear_color(0.0, 0.0, 0.0, 1.0);
         gl.clear(glow::COLOR_BUFFER_BIT);
         'render: loop {
             for event in event_loop.poll_iter() {
@@ -46,13 +33,18 @@ fn main() {
                 }
             }
 
-            tick();
+            gl.clear(glow::COLOR_BUFFER_BIT);
+            gl.draw_arrays(glow::POINTS, 0, 3);
             window.gl_swap_window();
         }
 
         gl.delete_program(program);
-        gl.delete_vertex_array(vao);
-        gl.delete_buffer(vbo);
+        for vao in vaos {
+            gl.delete_vertex_array(vao)
+        }
+        for vbo in vbos {
+            gl.delete_buffer(vbo)
+        }
     }
 }
 
@@ -65,11 +57,12 @@ unsafe fn create_sdl2_context() -> (
     let sdl = sdl2::init().unwrap();
     let video = sdl.video().unwrap();
     let gl_attr = video.gl_attr();
-    gl_attr.set_context_profile(sdl2::video::GLProfile::Core);
-    gl_attr.set_context_version(3, 0);
+    gl_attr.set_context_profile(sdl2::video::GLProfile::Compatibility);
+    gl_attr.set_context_version(3, 3);
     let window = video
         .window("Hello Triangle!", 800, 800)
         .opengl()
+        .position_centered()
         .build()
         .unwrap();
     let gl_context = window.gl_create_context().unwrap();
@@ -113,6 +106,7 @@ unsafe fn create_program(
     program
 }
 
+#[allow(dead_code)]
 unsafe fn draw(
     gl: &Context,
     n: i32,
@@ -121,13 +115,14 @@ unsafe fn draw(
     u_model_matrix: &NativeUniformLocation,
 ) {
     let mut result = nalgebra_glm::rotate(model_matrix, current_angle, &vec3(0.0, 0.0, 1.0));
-    let translation:TVec3<f32> = vec3(0.35, 0.0,0.0);
+    let translation: TVec3<f32> = vec3(0.35, 0.0, 0.0);
     result.append_translation_mut(&translation);
     let matrix_slice = result.as_slice();
     gl.uniform_matrix_4_f32_slice(Some(&u_model_matrix), false, matrix_slice);
     gl.clear(glow::COLOR_BUFFER_BIT);
     gl.draw_arrays(glow::TRIANGLES, 0, n);
 }
+#[allow(dead_code)]
 fn animate(start: &mut Instant, angle: f32) -> f32 {
     let now = Instant::now();
     let elapsed = now.duration_since(start.clone());
@@ -141,27 +136,51 @@ const FRAG_SOURCE: &'static str = include_str!("frag.glsl");
 unsafe fn init_vertex_buffer(
     gl: &glow::Context,
     program: glow::NativeProgram,
-) -> (NativeBuffer, NativeVertexArray, i32) {
-    let vertices: &[f32] = &[0.0, 0.5, -0.5, -0.5, 0.5, -0.5];
+) -> (Vec<NativeBuffer>, Vec<NativeVertexArray>, i32) {
+    let mut vbos: Vec<NativeBuffer> = Vec::new();
+    let mut vaos: Vec<VertexArray> = Vec::new();
 
-    let trigs = core::slice::from_raw_parts(
+    let vertices: &[f32] = &[0.0, 0.5, -0.5, -0.5, 0.5, -0.5];
+    let sizes: &[f32] = &[10.0, 20.0, 30.0];
+
+    let u8vertices = core::slice::from_raw_parts(
         vertices.as_ptr() as *const u8,
         vertices.len() * size_of::<f32>(),
     );
+    let u8sizes =
+        core::slice::from_raw_parts(sizes.as_ptr() as *const u8, sizes.len() * size_of::<f32>());
 
-    let vbo = gl.create_buffer().unwrap();
-    gl.bind_buffer(glow::ARRAY_BUFFER, Some(vbo));
-    gl.buffer_data_u8_slice(glow::ARRAY_BUFFER, trigs, glow::STATIC_DRAW);
+    //vertices buffer
+    let vertex_buffer = gl.create_buffer().unwrap();
+    gl.bind_buffer(glow::ARRAY_BUFFER, Some(vertex_buffer));
+    gl.buffer_data_u8_slice(glow::ARRAY_BUFFER, u8vertices, glow::STATIC_DRAW);
     let vao = gl.create_vertex_array().unwrap();
     gl.bind_vertex_array(Some(vao));
 
+    // Position atttribute
     let a_pos = gl.get_attrib_location(program, "aPos").unwrap();
     gl.vertex_attrib_pointer_f32(a_pos, 2, glow::FLOAT, false, 0, 0);
     gl.enable_vertex_attrib_array(a_pos);
 
-    (vbo, vao, vertices.len() as i32)
+    //Size attribute
+
+    let size_buffer = gl.create_buffer().unwrap();
+    gl.bind_buffer(glow::ARRAY_BUFFER, Some(size_buffer));
+    gl.buffer_data_u8_slice(glow::ARRAY_BUFFER, u8sizes, glow::STATIC_DRAW);
+    let a_point_size = gl.get_attrib_location(program, "aPointSize").unwrap();
+    gl.vertex_attrib_pointer_f32(a_point_size, 1, glow::FLOAT, false, 0, 0);
+    gl.enable_vertex_attrib_array(a_point_size);
+    let sizevao = gl.create_vertex_array().unwrap();
+    gl.bind_vertex_array(Some(sizevao));
+    vbos.push(vertex_buffer);
+    vaos.push(vao);
+    vbos.push(size_buffer);
+    vaos.push(sizevao);
+
+    (vbos, vaos, vertices.len() as i32)
 }
 
+#[allow(dead_code)]
 unsafe fn set_uniform(gl: &glow::Context, program: NativeProgram, name: &str, value: f32) {
     let uniform_location = gl.get_uniform_location(program, name);
 
