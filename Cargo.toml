@@ -9,3 +9,5 @@ edition = "2021"
 glow = "0.11.2"
 sdl2 = "0.35.1"
 nalgebra-glm = "*"
+image = "0.24.6"
+bytemuck = { version = "1.13.1", features = ["derive"]}
